@@ -24,6 +24,20 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permettre à l'application d'utiliser la caméra pour photographier le stationnement."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Permettre à l'application d'enregistrer la photo dans votre galerie."
+        }
+      ]
+    ]
   }
 }
