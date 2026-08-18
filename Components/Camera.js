@@ -8,6 +8,7 @@ export default function Camera({ parkingId, onPhotoSaved }) {
     const isFocused = useIsFocused();
     const [permission, requestPermission] = useCameraPermissions();
     const [photoUri, setPhotoUri] = useState(null);
+    const [facing, setFacing] = useState('back');
     const cameraRef = useRef(null);
 
     if (!permission) {
@@ -24,6 +25,10 @@ export default function Camera({ parkingId, onPhotoSaved }) {
             </View>
         );
     }
+
+    const toggleCameraFacing = () => {
+        setFacing(current => (current === 'back' ? 'front' : 'back'));
+    };
 
     const takePicture = async () => {
         if (cameraRef.current) {
@@ -77,12 +82,18 @@ export default function Camera({ parkingId, onPhotoSaved }) {
         <View style={styles.container}>
             {isFocused && (
                 <CameraView
+                    key={facing}
                     style={StyleSheet.absoluteFillObject}
-                    facing="back"
+                    facing={facing}
                     ref={cameraRef}
                 />
             )}
-            <SafeAreaView style={styles.cameraOverlay}>
+            <SafeAreaView style={styles.topOverlay} pointerEvents="box-none">
+                <TouchableOpacity style={styles.switchButton} onPress={toggleCameraFacing}>
+                    <Text style={styles.switchText}>🔄</Text>
+                </TouchableOpacity>
+            </SafeAreaView>
+            <SafeAreaView style={styles.cameraOverlay} pointerEvents="box-none">
                 <View style={styles.captureContainer}>
                     <TouchableOpacity style={styles.captureButton} onPress={takePicture}>
                         <View style={styles.innerCaptureButton} />
@@ -115,6 +126,26 @@ const styles = StyleSheet.create({
         ...StyleSheet.absoluteFillObject,
         justifyContent: 'flex-end',
         backgroundColor: 'transparent',
+    },
+    topOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'flex-start',
+        alignItems: 'flex-end',
+        paddingTop: 10,
+        paddingRight: 20,
+        backgroundColor: 'transparent',
+    },
+    switchButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    switchText: {
+        color: '#fff',
+        fontSize: 20,
     },
     captureContainer: {
         alignItems: 'center',

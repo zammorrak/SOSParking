@@ -2,6 +2,7 @@ import {ActivityIndicator, Button, Image, StyleSheet, Text, View} from "react-na
 import {useEffect, useState} from "react";
 import Camera from "../Components/Camera";
 import { File, Paths } from 'expo-file-system';
+import {GetDistanceInKm} from '../Utils/Utils'
 
 
 export default function DetailScreen({ route }) {
@@ -14,7 +15,6 @@ export default function DetailScreen({ route }) {
     const destination = new File(Paths.document, `parking_${parkingData._id}.jpg`);
 
     const currentPhotoUri = savedPhoto || (destination.exists ? `${destination.uri}?t=${Date.now()}` : null);
-
     useEffect(() => {
         getAddress(parkingData?.nLatitude, parkingData?.nLongitude);
         if (destination.exists) {
@@ -28,20 +28,6 @@ export default function DetailScreen({ route }) {
             setSavedPhoto(null);
         }
     }
-
-    const getDistanceInKm = (lat1, lon1, lat2, lon2) => {
-        const R = 6371;
-        const dLat = (lat2 - lat1) * (Math.PI / 180);
-        const dLon = (lon2 - lon1) * (Math.PI / 180);
-
-        const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return (R * c).toFixed(2);
-    };
 
     const handlePhotoSaved = (file) => {
         const updatedUri = `${file.uri}?t=${Date.now()}`;
@@ -89,7 +75,7 @@ export default function DetailScreen({ route }) {
         <View style={styles.container}>
             <Text style={styles.title}>Detail</Text>
             <Text>Adresse: {address}</Text>
-            <Text>Distance: {getDistanceInKm(parkingData?.nLatitude, parkingData?.nLongitude, userLoc.latitude.__getValue(), userLoc.longitude.__getValue())}KM</Text>
+            <Text>Distance: {GetDistanceInKm(parkingData?.nLatitude, parkingData?.nLongitude, userLoc.latitude, userLoc.longitude)}KM</Text>
             <Text>id: {parkingData._id}</Text>
             <Text>latitude: {parkingData?.nLatitude}</Text>
             <Text>longitude: {parkingData?.nLongitude}</Text>
