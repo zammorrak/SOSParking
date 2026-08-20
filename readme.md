@@ -144,7 +144,7 @@ Dans `NotificationCmp.js` :
 
 ---
 
-## 🐛 Dépannage rapide
+## Dépannage rapide
 
 ### Pas de notification en mode DEV
 - Vérifier permission notifications (`granted`)
