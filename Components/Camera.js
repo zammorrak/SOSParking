@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Image, SafeAreaView, Alert } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Image, Alert } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useIsFocused } from '@react-navigation/native';
 import { File, Paths } from 'expo-file-system';
@@ -9,6 +9,7 @@ export default function Camera({ parkingId, onPhotoSaved }) {
     const [permission, requestPermission] = useCameraPermissions();
     const [photoUri, setPhotoUri] = useState(null);
     const [facing, setFacing] = useState('back');
+    const [cameraReady, setCameraReady] = useState(false);
     const cameraRef = useRef(null);
 
     if (!permission) {
@@ -27,13 +28,19 @@ export default function Camera({ parkingId, onPhotoSaved }) {
     }
 
     const toggleCameraFacing = () => {
+        setCameraReady(false);
         setFacing(current => (current === 'back' ? 'front' : 'back'));
     };
 
     const takePicture = async () => {
         if (cameraRef.current) {
-            const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
-            setPhotoUri(photo.uri);
+            try {
+                const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
+                setPhotoUri(photo.uri);
+            } catch (error) {
+                console.error('Erreur prise de photo :', error);
+                Alert.alert('Erreur', 'Impossible de prendre la photo.');
+            }
         }
     };
 
@@ -45,18 +52,21 @@ export default function Camera({ parkingId, onPhotoSaved }) {
         try {
             const photoFile = new File(photoUri);
             const destination = new File(Paths.document, `parking_${parkingId}.jpg`);
-            console.log(destination.uri);
+
             if (destination.exists) {
                 destination.delete();
             }
+
             photoFile.move(destination);
+
             if (onPhotoSaved) {
                 onPhotoSaved(destination);
             }
-            Alert.alert("Succès !", "La photo du parking a été enregistrée.");
+
+            Alert.alert('Succès !', 'La photo du parking a été enregistrée.');
         } catch (error) {
-            console.error("Erreur lors de la sauvegarde :", error);
-            Alert.alert("Erreur", "Impossible de sauvegarder la photo.");
+            console.error('Erreur lors de la sauvegarde :', error);
+            Alert.alert('Erreur', 'Impossible de sauvegarder la photo.');
         }
     };
 
@@ -64,7 +74,7 @@ export default function Camera({ parkingId, onPhotoSaved }) {
         return (
             <View style={styles.container}>
                 <Image source={{ uri: photoUri }} style={styles.previewImage} />
-                <SafeAreaView style={styles.confirmationOverlay}>
+                <View style={styles.confirmationOverlay}>
                     <View style={styles.confirmationButtons}>
                         <TouchableOpacity style={[styles.btn, styles.btnCancel]} onPress={handleRetake}>
                             <Text style={styles.btnText}>Recommencer</Text>
@@ -73,7 +83,7 @@ export default function Camera({ parkingId, onPhotoSaved }) {
                             <Text style={styles.btnText}>Valider</Text>
                         </TouchableOpacity>
                     </View>
-                </SafeAreaView>
+                </View>
             </View>
         );
     }
@@ -82,24 +92,30 @@ export default function Camera({ parkingId, onPhotoSaved }) {
         <View style={styles.container}>
             {isFocused && (
                 <CameraView
-                    key={facing}
                     style={StyleSheet.absoluteFillObject}
                     facing={facing}
                     ref={cameraRef}
+                    onCameraReady={() => setCameraReady(true)}
                 />
             )}
-            <SafeAreaView style={styles.topOverlay} pointerEvents="box-none">
-                <TouchableOpacity style={styles.switchButton} onPress={toggleCameraFacing}>
-                    <Text style={styles.switchText}>🔄</Text>
-                </TouchableOpacity>
-            </SafeAreaView>
-            <SafeAreaView style={styles.cameraOverlay} pointerEvents="box-none">
-                <View style={styles.captureContainer}>
-                    <TouchableOpacity style={styles.captureButton} onPress={takePicture}>
-                        <View style={styles.innerCaptureButton} />
-                    </TouchableOpacity>
-                </View>
-            </SafeAreaView>
+
+            {cameraReady && (
+                <>
+                    <View style={styles.topOverlay} pointerEvents="box-none">
+                        <TouchableOpacity style={styles.switchButton} onPress={toggleCameraFacing}>
+                            <Text style={styles.switchText}>🔄</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.cameraOverlay} pointerEvents="box-none">
+                        <View style={styles.captureContainer}>
+                            <TouchableOpacity style={styles.captureButton} onPress={takePicture}>
+                                <View style={styles.innerCaptureButton} />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </>
+            )}
         </View>
     );
 }

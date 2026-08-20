@@ -1,6 +1,6 @@
 import { View, StyleSheet, Dimensions, ActivityIndicator, Text } from "react-native";
-import MapView, { AnimatedRegion, Marker, UrlTile } from "react-native-maps";
-import {useEffect, useRef, useState} from "react";
+import MapView, { AnimatedRegion, Marker } from "react-native-maps";
+import { useEffect, useRef, useState } from "react";
 import * as Location from 'expo-location';
 import { useNavigation } from "@react-navigation/native";
 import { GetDistanceInKm } from "../Utils/Utils";
@@ -8,32 +8,22 @@ import NotificationCmp from "./NotificationCmp";
 
 export default function Map() {
     let closeDistance = 48.44;
-
     const navigation = useNavigation();
+    const mapRef = useRef(null);
 
-    const INITIAL_REGION = {
-        latitude: 45.50884,
-        longitude: -73.58781,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-    };
-
-    const coordinate = useRef(
-        new AnimatedRegion({
-            latitude: INITIAL_REGION.latitude,
-            longitude: INITIAL_REGION.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-        })
-    ).current;
-
-    const [userLocation, setUserLocation] = useState({
-        latitude: INITIAL_REGION.latitude,
-        longitude: INITIAL_REGION.longitude,
-    });
-
+    const [userLocation, setUserLocation] = useState(null);
     const [parkingData, setParkingData] = useState([]);
-    const [loading, setLoading] = useState(true);
+
+    const [isDataLoaded, setIsDataLoaded] = useState(false);
+    const [isLocationLoaded, setIsLocationLoaded] = useState(false);
+    const [isMapReady, setIsMapReady] = useState(false);
+
+    const coordinate = useRef(new AnimatedRegion({
+        latitude: 0,
+        longitude: 0,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+    })).current;
 
     useEffect(() => {
         const fetchData = async () => {
@@ -46,7 +36,7 @@ export default function Map() {
             } catch (err) {
                 console.log("Erreur Fetch:", err);
             } finally {
-                setLoading(false);
+                setIsDataLoaded(true);
             }
         };
         fetchData();
@@ -55,9 +45,28 @@ export default function Map() {
     useEffect(() => {
         let subscription = null;
 
-        const StartTracking = async () => {
+        const startTracking = async () => {
             const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') return;
+            if (status !== 'granted') {
+                setIsLocationLoaded(true);
+                return;
+            }
+
+            const initialLocation = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.High,
+            });
+
+            const { latitude, longitude } = initialLocation.coords;
+
+            coordinate.setValue({
+                latitude,
+                longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+            });
+
+            setUserLocation({ latitude, longitude });
+            setIsLocationLoaded(true);
 
             subscription = await Location.watchPositionAsync(
                 {
@@ -67,17 +76,20 @@ export default function Map() {
                 },
                 (location) => {
                     const { latitude, longitude } = location.coords;
+
                     coordinate.timing({
                         latitude,
                         longitude,
                         duration: 500,
                         useNativeDriver: false
                     }).start();
+
                     setUserLocation({ latitude, longitude });
                 }
             );
         };
-        StartTracking();
+
+        startTracking();
 
         return () => {
             if (subscription) subscription.remove();
@@ -85,38 +97,56 @@ export default function Map() {
     }, []);
 
     const isInRangeMarker = (lat1, lon1, lat2, lon2) => {
+        if (!lat2 || !lon2) return false;
         let distance = GetDistanceInKm(lat1, lon1, lat2, lon2);
         return distance < closeDistance;
     };
 
-    if (loading) {
-        return (
-            <View style={[styles.container, styles.center]}>
-                <ActivityIndicator size="large" color="#0000ff" />
-            </View>
-        );
-    }
+    const isLoading = !isDataLoaded || !isLocationLoaded || !isMapReady;
 
     return (
         <View style={styles.container}>
+            {userLocation && (
+                <NotificationCmp userLocation={userLocation} parkingData={parkingData} thresHoldKm={100000} />
+            )}
 
             <MapView
+                ref={mapRef}
                 style={styles.map}
-                initialRegion={INITIAL_REGION}
+                onMapReady={() => setIsMapReady(true)}
+                initialRegion={
+                    userLocation
+                        ? {
+                            latitude: userLocation.latitude,
+                            longitude: userLocation.longitude,
+                            latitudeDelta: 0.05,
+                            longitudeDelta: 0.05,
+                        }
+                        : {
+                            latitude: 45.50884,
+                            longitude: -73.58781,
+                            latitudeDelta: 0.05,
+                            longitudeDelta: 0.05,
+                        }
+                }
                 mapType="standard"
             >
+                {userLocation && (
+                    <Marker.Animated coordinate={coordinate}>
+                        <View style={styles.dot} />
+                    </Marker.Animated>
+                )}
 
-                <Marker.Animated coordinate={coordinate}>
-                    <View style={styles.dot} />
-                </Marker.Animated>
-
-                {parkingData.map((parking, index) => {
+                {parkingData.map((parking) => {
                     const lat = parseFloat(parking.nLatitude);
                     const lon = parseFloat(parking.nLongitude);
 
                     if (isNaN(lat) || isNaN(lon)) return null;
 
-                    const isInRange = isInRangeMarker(lat, lon, userLocation.latitude, userLocation.longitude);
+                    const isInRange = userLocation
+                        ? isInRangeMarker(lat, lon, userLocation.latitude, userLocation.longitude)
+                        : false;
+
                     return (
                         <Marker
                             key={`${parking._id}-${isInRange}`}
@@ -131,17 +161,30 @@ export default function Map() {
                     );
                 })}
             </MapView>
-            <View style={styles.legendContainer}>
-                <Text>Red color = in range</Text>
-                <Text>Yellow color = out range</Text>
+
+            <View style={styles.legendDark}>
+                <View style={styles.legendItem}>
+                    <View style={[styles.colorDot, { backgroundColor: '#FF3B30' }]} />
+                    <Text style={styles.legendDarkText}>À portée</Text>
+                </View>
+                <View style={styles.legendItem}>
+                    <View style={[styles.colorDot, { backgroundColor: '#FFCC00' }]} />
+                    <Text style={styles.legendDarkText}>Hors portée</Text>
+                </View>
             </View>
+
+            {isLoading && (
+                <View style={styles.loadingOverlay}>
+                    <ActivityIndicator size="large" color="#0000ff" />
+                    <Text style={styles.loadingText}>Chargement de la carte...</Text>
+                </View>
+            )}
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    center: { justifyContent: 'center', alignItems: 'center' },
     map: {
         width: Dimensions.get('window').width,
         height: Dimensions.get('window').height,
@@ -154,12 +197,40 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         borderColor: '#FFF',
     },
-    legendContainer: {
+    loadingOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 999,
+    },
+    loadingText: {
+        marginTop: 10,
+        fontSize: 16,
+        color: '#333',
+    },
+    legendDark: {
         position: 'absolute',
-        bottom: 30,
+        bottom: 35,
         left: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        backgroundColor: 'rgba(28, 28, 30, 0.85)',
+        borderRadius: 10,
         padding: 10,
-        borderRadius: 8,
-    }
+    },
+    legendItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 2,
+    },
+    colorDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        marginRight: 8,
+    },
+    legendDarkText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
 });
