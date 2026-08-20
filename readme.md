@@ -48,7 +48,7 @@ npx expo start
 
 ---
 
-## ▶️ Lancer le projet
+## Lancer le projet
 
 ```bash
 npx expo start
