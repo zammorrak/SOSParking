@@ -42,7 +42,6 @@ export default function NotificationCmp({userLocation, parkingData, thresHoldKm 
                 const distance = GetDistanceInKm(userLocation.latitude, userLocation.longitude, parkingLatitude, parkingLongitude);
 
                 if (distance <= thresHoldKm && !notificationParkings.current.has(parking._id)) {
-                    console.log(parking);
                     sendParkingNotification(parking.sNoPlace).then(() => {
                         notificationParkings.current.add(parking._id);
                     }).catch(err => console.log(err));
